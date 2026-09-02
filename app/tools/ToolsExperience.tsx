@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { PdfWorkbench } from "./pdf-zusammenfuegen/PdfWorkbench";
 import { WohnungssucheWorkbench } from "./wohnungssuche/WohnungssucheWorkbench";
+import QueryConfiguratorPrototype from "./query-konfigurator/QueryConfiguratorPrototype";
 
 export function ToolsExperience() {
   const pdfDialogRef = useRef<HTMLDialogElement>(null);
@@ -13,11 +14,15 @@ export function ToolsExperience() {
   const wohnungTriggerRef = useRef<HTMLButtonElement>(null);
   const closeWohnungTool = () => wohnungDialogRef.current?.close();
 
+  const queryDialogRef = useRef<HTMLDialogElement>(null);
+  const queryTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeQueryTool = () => queryDialogRef.current?.close();
+
   return (
     <>
       <section className="tools-directory" aria-labelledby="tools-directory-title">
         <div className="tools-directory-heading">
-          <p className="eyebrow">01–02 / Verfügbar</p>
+          <p className="eyebrow">01–03 / Verfügbar</p>
           <p id="tools-directory-title">Werkzeuge, die eine konkrete Aufgabe lösen.</p>
         </div>
         <button
@@ -42,6 +47,19 @@ export function ToolsExperience() {
           <span className="tool-index">02</span>
           <span className="tool-title">Wohnungssuche-Assistent</span>
           <span className="tool-meta">Prototyp · Mock-Daten · Freigabe-Queue</span>
+          <span className="tool-arrow" aria-hidden="true">
+            ↗
+          </span>
+        </button>
+        <button
+          ref={queryTriggerRef}
+          type="button"
+          className="tool-row"
+          onClick={() => queryDialogRef.current?.showModal()}
+        >
+          <span className="tool-index">03</span>
+          <span className="tool-title">Abfrage-Konfigurator</span>
+          <span className="tool-meta">Prototyp · Regelbaum · Text-Abfrage</span>
           <span className="tool-arrow" aria-hidden="true">
             ↗
           </span>
@@ -112,6 +130,40 @@ export function ToolsExperience() {
           </header>
           <div className="tool-workspace-body">
             <WohnungssucheWorkbench />
+          </div>
+        </div>
+      </dialog>
+      <dialog
+        ref={queryDialogRef}
+        className="tool-dialog"
+        aria-labelledby="query-workspace-title"
+        onCancel={closeQueryTool}
+        onClose={() => queryTriggerRef.current?.focus()}
+        onClick={(event) => {
+          if (event.target === queryDialogRef.current) closeQueryTool();
+        }}
+      >
+        <div className="tool-workspace">
+          <header className="tool-workspace-header">
+            <div>
+              <p className="eyebrow">JNSW.DE / Tools / Prototyp</p>
+              <h2 id="query-workspace-title">Abfrage-Konfigurator</h2>
+            </div>
+            <p className="workspace-privacy">
+              <span aria-hidden="true">●</span> Prototyp · Beispieldaten, kein Backend
+            </p>
+            <button
+              type="button"
+              className="workspace-close"
+              onClick={closeQueryTool}
+              aria-label="Abfrage-Konfigurator schließen"
+            >
+              <span>Schließen</span>
+              <b aria-hidden="true">×</b>
+            </button>
+          </header>
+          <div className="tool-workspace-body">
+            <QueryConfiguratorPrototype />
           </div>
         </div>
       </dialog>
