@@ -9,7 +9,7 @@
     {
       "binding": "DB",
       "database_name": "jwx_db01",
-      "database_id": "2b1176dc-bbd1-4a0f-bd2d-0714bcfff1e6",
+      "database_id": "abdb3246-a9b0-4236-a838-186d4187bdf4",
       "migrations_dir": "drizzle",
     },
   ],

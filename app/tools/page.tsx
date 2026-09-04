@@ -1,4 +1,6 @@
-﻿import type { Metadata } from "next";
+﻿import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { requireActiveUser } from "../auth";
 import { SiteNav } from "../SiteNav";
 import { ToolsExperience } from "./ToolsExperience";
 
@@ -7,7 +9,10 @@ export const metadata: Metadata = {
   description: "Kostenlose Werkzeuge für digitale Arbeit – direkt und datensparsam im Browser.",
 };
 
-export default function ToolsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ToolsPage() {
+  if (!(await requireActiveUser())) redirect("/community");
   return (
     <main className="tools-page">
       <SiteNav />

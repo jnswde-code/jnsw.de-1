@@ -966,7 +966,9 @@
   border: 1px solid var(--line);
   background: var(--surface-raised);
   color: var(--paper);
-  font: 12px Manrope, sans-serif;
+  font:
+    12px Manrope,
+    sans-serif;
 }
 .wohnung-filters input[type="range"] {
   width: 160px;
@@ -1061,7 +1063,9 @@
   border: 1px solid var(--line);
   background: var(--surface-raised);
   color: var(--paper);
-  font: 11px Manrope, sans-serif;
+  font:
+    11px Manrope,
+    sans-serif;
 }
 .wohnung-card-actions a {
   font:
@@ -1137,6 +1141,119 @@
   .wohnung-grid {
     grid-template-columns: 1fr;
   }
+}
+.support-ki-tool {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vh, 58px) clamp(25px, 6vw, 40px);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.support-ki-tool h3 {
+  max-width: 760px;
+  margin: 12px 0 18px;
+  font-size: clamp(2.2rem, 4.2vw, 4rem);
+  line-height: 0.9;
+  letter-spacing: -0.08em;
+}
+.support-ki-tool > p:not(.eyebrow) {
+  max-width: 620px;
+  margin: 0 0 20px;
+  color: rgba(244, 240, 231, 0.68);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.support-ki-error {
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 91, 52, 0.4);
+  background: rgba(255, 91, 52, 0.16);
+  color: #ffd5c9;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.support-ki-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  margin-bottom: 16px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.support-ki-state {
+  font:
+    10px "DM Mono",
+    monospace;
+  text-transform: uppercase;
+  color: rgba(244, 240, 231, 0.55);
+}
+.support-ki-state-connected {
+  color: var(--acid);
+}
+.support-ki-state-connecting {
+  color: var(--blue);
+}
+.support-ki-state-error {
+  color: #ff8a68;
+}
+.support-ki-messages {
+  flex: 1;
+  min-height: 240px;
+  max-height: 46vh;
+  overflow: auto;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.support-ki-empty {
+  color: rgba(244, 240, 231, 0.55);
+  font-size: 13px;
+}
+.support-ki-message {
+  max-width: 78%;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.support-ki-message span {
+  display: block;
+  margin-bottom: 4px;
+  font:
+    9px "DM Mono",
+    monospace;
+  text-transform: uppercase;
+  color: rgba(244, 240, 231, 0.5);
+}
+.support-ki-message-me {
+  align-self: flex-end;
+  background: var(--surface);
+}
+.support-ki-message-agent {
+  align-self: flex-start;
+  background: var(--surface-raised);
+}
+.support-ki-composer {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.support-ki-composer input {
+  flex: 1;
+  min-height: 45px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--paper);
+  font:
+    14px Manrope,
+    sans-serif;
 }
 @keyframes workspace-in {
   from {
