@@ -3,14 +3,15 @@
 //   1. sichert alle DNS-Einträge der Zone als JSON,
 //   2. entfernt Mailgun-Einträge (MX, SPF, CNAME/TXT mit „mailgun“),
 //   3. schaltet Email Routing ein (MX/SPF/DKIM von Cloudflare),
-//   4. legt die Zieladresse an und leitet per Catch-all alles dorthin weiter,
+//   4. legt die Zieladresse an; der Catch-all gibt alles an den Worker des Mail-Eingangs
+//      (--an-worker, der die Kopie an die Zieladresse weiterleitet) oder leitet direkt weiter,
 //   5. schaltet Email Sending für die Domain ein (cf-bounce, DKIM),
 //   6. ergänzt fehlende Einträge und einen DMARC-Eintrag (p=none), falls keiner da ist.
 //
 // Ohne --anwenden zeigt das Skript nur, was es tun würde. Wiederholbar: Vorhandenes bleibt.
 //
 //   CLOUDFLARE_API_TOKEN=… NODE_USE_ENV_PROXY=1 node scripts/cloudflare-mail.mjs \
-//     --domain jnsw.de --weiterleiten-an ich@example.org [--anwenden]
+//     --domain jnsw.de --weiterleiten-an ich@example.org --an-worker jnsw-mail-eingang [--anwenden]
 import { writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -101,6 +102,39 @@ export function fehlendeEintraege(erwartet, vorhanden, domain) {
   );
 }
 
+/**
+ * Soll-Regel des Catch-all: mit Worker die Aktion „worker“ (der Worker leitet die Kopie selbst
+ * weiter), sonst „forward“ an die Zieladresse; ohne beides null (bleibt unverändert).
+ */
+export function catchAllRegel(opts) {
+  if (opts.worker)
+    return {
+      name: `Alles an Worker ${opts.worker}`,
+      enabled: true,
+      matchers: [{ type: "all" }],
+      actions: [{ type: "worker", value: [opts.worker] }],
+    };
+  if (opts.ziel)
+    return {
+      name: `Alles an ${opts.ziel}`,
+      enabled: true,
+      matchers: [{ type: "all" }],
+      actions: [{ type: "forward", value: [opts.ziel] }],
+    };
+  return null;
+}
+
+/** Hat der vorhandene Catch-all schon genau die Aktion der Soll-Regel? */
+export function catchAllPasst(ist, soll) {
+  if (!ist?.enabled || !soll) return false;
+  const [aktion] = soll.actions;
+  return (
+    ist.actions?.length === 1 &&
+    ist.actions[0].type === aktion.type &&
+    JSON.stringify(ist.actions[0].value ?? []) === JSON.stringify(aktion.value)
+  );
+}
+
 export function argumente(argv) {
   const opts = { anwenden: false, domain: "jnsw.de", ziel: process.env.MAIL_WEITERLEITUNG ?? "" };
   for (let i = 0; i < argv.length; i++) {
@@ -108,6 +142,7 @@ export function argumente(argv) {
     if (arg === "--anwenden") opts.anwenden = true;
     else if (arg === "--domain") opts.domain = argv[++i];
     else if (arg === "--weiterleiten-an") opts.ziel = argv[++i];
+    else if (arg === "--an-worker") opts.worker = argv[++i];
     else if (arg === "--sicherung") opts.sicherung = argv[++i];
     else throw new Error(`Unbekanntes Argument: ${arg}`);
   }
@@ -203,25 +238,22 @@ async function main() {
         `Zieladresse ${opts.ziel} ist noch nicht bestätigt – Link in der Cloudflare-Mail klicken.`,
       );
     else console.log(`Zieladresse ${opts.ziel} ist bestätigt.`);
-
+  } else {
+    console.log("Keine Zieladresse (--weiterleiten-an): keine Zieladresse angelegt.");
+  }
+  const soll = catchAllRegel(opts);
+  if (soll) {
     const catchAll = await cf("GET", `/zones/${zoneId}/email/routing/rules/catch_all`).catch(
       () => null,
     );
-    const zielSchon =
-      catchAll?.enabled &&
-      catchAll.actions?.some((a) => a.type === "forward" && a.value?.includes(opts.ziel));
-    if (zielSchon) console.log(`Catch-all leitet schon an ${opts.ziel} weiter.`);
+    const ziel = opts.worker ? `Worker ${opts.worker}` : opts.ziel;
+    if (catchAllPasst(catchAll, soll)) console.log(`Catch-all geht schon an ${ziel}.`);
     else
-      await tun(`Catch-all: alle Adressen @${opts.domain} → ${opts.ziel}`, () =>
-        cf("PUT", `/zones/${zoneId}/email/routing/rules/catch_all`, {
-          name: `Alles an ${opts.ziel}`,
-          enabled: true,
-          matchers: [{ type: "all" }],
-          actions: [{ type: "forward", value: [opts.ziel] }],
-        }),
+      await tun(`Catch-all: alle Adressen @${opts.domain} → ${ziel}`, () =>
+        cf("PUT", `/zones/${zoneId}/email/routing/rules/catch_all`, soll),
       );
   } else {
-    console.log("Keine Zieladresse (--weiterleiten-an): Weiterleitung bleibt unverändert.");
+    console.log("Weder --an-worker noch --weiterleiten-an: Catch-all bleibt unverändert.");
   }
 
   // 4. Email Sending einschalten

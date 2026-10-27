@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   argumente,
+  catchAllPasst,
+  catchAllRegel,
   fehlendeEintraege,
   fqdn,
   mailgunAbloesen,
@@ -87,6 +89,30 @@ test("parses script arguments", () => {
   assert.equal(opts.ziel, "ich@example.org");
   assert.equal(opts.anwenden, true);
   assert.throws(() => argumente(["--unbekannt"]), /Unbekanntes Argument/);
+});
+
+test("catch-all goes to the mail intake worker with --an-worker, otherwise forwards", () => {
+  const opts = argumente([
+    "--weiterleiten-an",
+    "ich@example.org",
+    "--an-worker",
+    "jnsw-mail-eingang",
+  ]);
+  assert.equal(opts.worker, "jnsw-mail-eingang");
+  const worker = catchAllRegel(opts);
+  assert.deepEqual(worker.actions, [{ type: "worker", value: ["jnsw-mail-eingang"] }]);
+  assert.deepEqual(worker.matchers, [{ type: "all" }]);
+  assert.deepEqual(catchAllRegel({ ziel: "ich@example.org" }).actions, [
+    { type: "forward", value: ["ich@example.org"] },
+  ]);
+  assert.equal(catchAllRegel({}), null);
+
+  const alt = { enabled: true, actions: [{ type: "forward", value: ["ich@example.org"] }] };
+  assert.equal(catchAllPasst(alt, worker), false);
+  assert.equal(catchAllPasst(alt, catchAllRegel({ ziel: "ich@example.org" })), true);
+  assert.equal(catchAllPasst({ ...worker, enabled: false }, worker), false);
+  assert.equal(catchAllPasst(worker, worker), true);
+  assert.equal(catchAllPasst(null, worker), false);
 });
 
 test("builds Cloudflare Email Service messages for binding and REST API", () => {
