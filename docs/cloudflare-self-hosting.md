@@ -56,6 +56,10 @@ npx wrangler secret put IMPORT_AI_SHARED_SECRET --config wrangler.production.jso
 npx wrangler secret put IMPORT_AI_WORKER_URL --config wrangler.production.jsonc
 ```
 
+E-Mail braucht keine Secrets mehr: Der Versand läuft über das Binding `EMAIL`
+(Cloudflare Email Service), siehe `docs/email-versand.md`. Die alten
+`MAILGUN_*`-Secrets können entfernt werden.
+
 Falls die Bewerbungswerkstatt (PR #90 / #81) oder Support-KI (PR #90) live gehen
 sollen, kommen je nach Umsetzungsstand weitere Secrets hinzu (z. B.
 `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` für Support-KI).
