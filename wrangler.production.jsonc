@@ -21,6 +21,10 @@
       "migrations_dir": "drizzle",
     },
   ],
+  // Cloudflare Email Service: Bestätigungs-E-Mails (app/mail.ts) gehen über dieses
+  // Binding. Voraussetzung: jnsw.de ist unter Email Sending eingerichtet
+  // (scripts/cloudflare-mail.mjs, docs/email-versand.md) und der Account hat Workers Paid.
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["service@jnsw.de"] }],
   // R2 ist auf diesem Account noch nicht aktiviert (Cloudflare verlangt eine
   // einmalige manuelle Bestätigung im Dashboard) und der bestehende Worker
   // `jnsw-de` hat aktuell kein R2-Binding. Sobald `APPLICATION_DOCUMENTS`

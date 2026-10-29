@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Mail-Eingang (docs/email-versand.md): eigener Worker, an den der Catch-all von Email
+  // Routing jede Mail an …@jnsw.de gibt (scripts/cloudflare-mail.mjs --an-worker). Er leitet eine
+  // Kopie an KOPIE_AN weiter, legt die Mail in D1 ab und liefert sie an jw-dev.
+  //
+  //   npx wrangler deploy --config wrangler.mail-eingang.jsonc
+  //   npx wrangler d1 migrations apply jnsw-mail-eingang --remote --config wrangler.mail-eingang.jsonc
+  //   Secrets: KOPIE_AN, JW_DEV_TOKEN, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET
+  //   (npx wrangler secret put <NAME> --config wrangler.mail-eingang.jsonc)
+  "name": "jnsw-mail-eingang",
+  "main": "./worker/mail-eingang.ts",
+  "compatibility_date": "2026-10-01",
+  // Kein öffentlicher Endpunkt: Der Worker hat keinen fetch-Handler.
+  "workers_dev": false,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "jnsw-mail-eingang",
+      // Nach `npx wrangler d1 create jnsw-mail-eingang` die ausgegebene ID eintragen.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "worker/mail-eingang-migrations",
+    },
+  ],
+  // Offene Mails erneut an jw-dev, falls der Dienst zu Hause aus war.
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": {
+    "JW_DEV_URL": "https://orga.jnsw.de",
+    // Empfängeradresse → Projekt in jw-dev; alles andere landet unzugeordnet auf der Seite „Anfragen“.
+    "ZUORDNUNG": { "mymvz@jnsw.de": "mymvz-wordpress" },
+  },
+}

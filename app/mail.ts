@@ -1,20 +1,51 @@
 import { env } from "cloudflare:workers";
+import {
+  DEFAULT_SENDER,
+  emailBindingMessage,
+  emailServiceApiBody,
+  type OutgoingEmail,
+  verificationEmail,
+} from "./mail-message";
 
-function requiredSecret(
-  name: "MAILGUN_API_KEY" | "MAILGUN_DOMAIN" | "MAIL_FROM" | "MAILGUN_API_BASE_URL",
+// Versand über Cloudflare Email Service (siehe docs/email-versand.md):
+// bevorzugt über das Workers-Binding `EMAIL` (send_email in wrangler.production.jsonc),
+// sonst über die REST-API mit CLOUDFLARE_ACCOUNT_ID und CLOUDFLARE_EMAIL_API_TOKEN.
+type SendEmailBinding = { send(message: ReturnType<typeof emailBindingMessage>): Promise<unknown> };
+
+function optionalSecret(
+  name: "MAIL_FROM" | "CLOUDFLARE_ACCOUNT_ID" | "CLOUDFLARE_EMAIL_API_TOKEN",
 ) {
   const value = env[name];
-  if (typeof value !== "string" || !value) throw new Error(`Missing ${name}`);
-  return value;
+  return typeof value === "string" && value ? value : null;
 }
 
-function verificationEmailHtml(verificationUrl: string) {
-  const safeUrl = verificationUrl
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  return `<!doctype html><html lang="de"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="color-scheme" content="dark" /><meta name="supported-color-schemes" content="dark" /><title>E-Mail-Adresse bestätigen · JNSW.DE</title></head><body style="margin:0;padding:0;background:#08080a;color:#f4f0e7;font-family:Manrope,Arial,sans-serif;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#08080a;"><tr><td style="padding:32px 20px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;margin:0 auto;background:#0d0d10;border:1px solid #2a2a30;"><tr><td style="padding:32px 32px 24px;border-bottom:1px solid #2a2a30;font-family:'DM Mono',Consolas,monospace;font-size:12px;letter-spacing:.08em;line-height:1.4;color:#b8ff62;">JNSW.DE / KONTO</td></tr><tr><td style="padding:40px 32px 32px;"><p style="margin:0 0 16px;font-family:'DM Mono',Consolas,monospace;font-size:12px;letter-spacing:.08em;line-height:1.4;color:#aaa8a2;">REGISTRIERUNG</p><h1 style="margin:0 0 20px;color:#f4f0e7;font-family:Manrope,Arial,sans-serif;font-size:36px;font-weight:700;letter-spacing:-.04em;line-height:1.05;">Bestätige deine<br />E-Mail-Adresse<span style="color:#b8ff62;">.</span></h1><p style="margin:0 0 28px;color:#d0cec8;font-size:16px;line-height:1.6;">Willkommen bei JNSW.DE. Dieser Klick bestätigt deine E-Mail-Adresse, schaltet dein Konto frei und führt dich zur Community.</p><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="background:#b8ff62;"><a href="${safeUrl}" style="display:inline-block;padding:14px 20px;color:#08080a;font-family:'DM Mono',Consolas,monospace;font-size:13px;font-weight:700;letter-spacing:.02em;line-height:1.2;text-decoration:none;">E-MAIL-ADRESSE BESTÄTIGEN →</a></td></tr></table><p style="margin:28px 0 0;padding-top:20px;border-top:1px solid #2a2a30;color:#aaa8a2;font-size:13px;line-height:1.6;">Der Link ist 24 Stunden gültig und kann nur einmal verwendet werden. Falls du kein Konto erstellt hast, kannst du diese E-Mail ignorieren.</p></td></tr><tr><td style="padding:24px 32px;background:#15151a;border-top:1px solid #2a2a30;color:#aaa8a2;font-family:'DM Mono',Consolas,monospace;font-size:11px;letter-spacing:.03em;line-height:1.6;">JNSW.DE · Berlin / Germany<br /><a href="mailto:hello@jnsw.de" style="color:#f4f0e7;text-decoration:underline;">hello@jnsw.de</a></td></tr></table></td></tr></table></body></html>`;
+function emailBinding(): SendEmailBinding | null {
+  const binding = env.EMAIL as SendEmailBinding | undefined;
+  return binding && typeof binding.send === "function" ? binding : null;
+}
+
+async function sendEmail(message: OutgoingEmail) {
+  const from = optionalSecret("MAIL_FROM") ?? DEFAULT_SENDER;
+  const binding = emailBinding();
+  if (binding) {
+    await binding.send(emailBindingMessage(message, from));
+    return;
+  }
+  const accountId = optionalSecret("CLOUDFLARE_ACCOUNT_ID");
+  const apiToken = optionalSecret("CLOUDFLARE_EMAIL_API_TOKEN");
+  if (!accountId || !apiToken)
+    throw new Error("Missing EMAIL binding or CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_EMAIL_API_TOKEN");
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/email/sending/send`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(emailServiceApiBody(message, from)),
+    },
+  );
+  const result = (await response.json().catch(() => null)) as { success?: boolean } | null;
+  if (!response.ok || !result?.success)
+    throw new Error(`Cloudflare Email Service rejected the email (${response.status})`);
 }
 
 export async function sendVerificationEmail({
@@ -24,25 +55,5 @@ export async function sendVerificationEmail({
   to: string;
   verificationUrl: string;
 }) {
-  const apiKey = requiredSecret("MAILGUN_API_KEY");
-  const domain = requiredSecret("MAILGUN_DOMAIN");
-  const from = requiredSecret("MAIL_FROM");
-  const baseUrl = requiredSecret("MAILGUN_API_BASE_URL").replace(/\/$/, "");
-  const body = new FormData();
-  body.set("from", `JNSW.DE <${from}>`);
-  body.set("to", to);
-  body.set("subject", "Bestätige deine E-Mail-Adresse für JNSW.DE");
-  body.set(
-    "text",
-    `Willkommen bei JNSW.DE.\n\nBestätige deine E-Mail-Adresse, schalte dein Konto frei und gelange zur Community:\n${verificationUrl}\n\nDer Link ist 24 Stunden gültig und kann nur einmal verwendet werden. Falls du kein Konto erstellt hast, kannst du diese E-Mail ignorieren.\n\nJNSW.DE · Berlin / Germany\nhello@jnsw.de`,
-  );
-  body.set("html", verificationEmailHtml(verificationUrl));
-  body.set("o:tracking", "no");
-  body.set("o:require-tls", "yes");
-  const response = await fetch(`${baseUrl}/v3/${encodeURIComponent(domain)}/messages`, {
-    method: "POST",
-    headers: { Authorization: `Basic ${btoa(`api:${apiKey}`)}` },
-    body,
-  });
-  if (!response.ok) throw new Error(`Mailgun rejected the verification email (${response.status})`);
+  await sendEmail(verificationEmail(to, verificationUrl));
 }
